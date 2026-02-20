@@ -8,10 +8,12 @@ Design: Dark navy + gold + forest green. Goldman meets Bloomberg.
 The document IS the product. Not a conversation — an artifact.
 
 Usage:
-    python deal_report.py                    # Generate sample
+    python deal_report.py                    # Generate both samples
+    python deal_report.py --test-go          # GO sample only
+    python deal_report.py --test-nogo        # NO-GO sample only
     python deal_report.py output.pdf         # Custom output path
 
-Status: BUILDING
+Status: LIVE v2
 """
 
 import os
@@ -26,8 +28,8 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm, cm
 from reportlab.pdfgen import canvas
 from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.platypus import Paragraph
 
 # Import gates
 from gates.economic_gate import economic_gate, EconomicResult, VetoCode
@@ -209,6 +211,31 @@ class DealPacketPDF:
         else:
             self.c.drawString(x, y, text)
 
+    def _draw_paragraph(self, x, y_top, max_width, text, size=9,
+                        color=Palette.INK, font="Helvetica", leading=None):
+        """
+        Draw word-wrapped text using a reportlab Paragraph.
+        y_top is the TOP of the text block (our top-down coordinate).
+        Returns the actual height consumed so callers can advance self.y.
+        """
+        if leading is None:
+            leading = size * 1.4
+        hex_color = color.hexval() if hasattr(color, 'hexval') else str(color)
+        # Sanitize text for XML — escape ampersands and angle brackets
+        safe = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        style = ParagraphStyle(
+            "para",
+            fontName=font,
+            fontSize=size,
+            leading=leading,
+            textColor=color,
+        )
+        para = Paragraph(safe, style)
+        w, h = para.wrap(max_width, 500 * mm)
+        # drawOn expects the BOTTOM-LEFT y coordinate
+        para.drawOn(self.c, x, y_top - h)
+        return h
+
     def render(self):
         """Render the complete DealPacket to PDF."""
         self._render_header()
@@ -256,6 +283,7 @@ class DealPacketPDF:
         self.y = self.height - header_h - 6 * mm
 
     # ── VERDICT BANNER ──
+    # DEFECT 4 FIX: Confidence badge flush-right, vertically centred
     def _render_verdict_banner(self):
         p = self.packet
         is_go = p.verdict == "GO"
@@ -264,48 +292,56 @@ class DealPacketPDF:
 
         # Banner background
         bg_color = Palette.VERDICT_GO if is_go else Palette.VERDICT_NO
-        self._draw_rounded_rect(self.margin, self.y - banner_h, uw, banner_h, 3, bg_color)
+        banner_top = self.y
+        banner_bottom = self.y - banner_h
+        self._draw_rounded_rect(self.margin, banner_bottom, uw, banner_h, 3, bg_color)
 
-        # Verdict text
+        # Vertical centre of banner
+        vc = banner_bottom + banner_h / 2
+
+        # Left block: Verdict text — vertically centred
         verdict_text = "GO" if is_go else "NO-GO"
-        self._text(self.margin + 8 * mm, self.y - 15 * mm, verdict_text,
-                   size=32, color=Palette.WHITE, font="Helvetica-Bold")
+        verdict_size = 32
+        self._text(self.margin + 8 * mm, vc - verdict_size * 0.35, verdict_text,
+                   size=verdict_size, color=Palette.WHITE, font="Helvetica-Bold")
 
-        # Verdict description
+        # Right block: Confidence badge — vertically centred, flush-right
+        rx = self.margin + uw - 6 * mm
+        conf_size = 22
+        self._text(rx, vc + 1 * mm, f"{p.confidence:.0%}",
+                   size=conf_size, color=Palette.WHITE, font="Helvetica-Bold", align="right")
+        self._text(rx, vc - 5 * mm, "CONFIDENCE",
+                   size=6, color=colors.HexColor("#FFFFFFAA"), font="Helvetica", align="right")
+
+        # Middle block: Description + offer (between verdict text and confidence)
+        mid_x = self.margin + 55 * mm
+        mid_max_w = uw - 55 * mm - 35 * mm  # Leave room for confidence badge
+
         if is_go and p.listing:
-            desc = f"This listing passes all active gates. Proceed with offer."
+            desc = "This listing passes all active gates. Proceed with offer."
         elif p.risk_flags:
             desc = p.risk_flags[0]
         else:
             desc = "Listing did not meet viability thresholds."
 
-        # Wrap description if needed
-        self._text(self.margin + 55 * mm, self.y - 10 * mm, desc,
-                   size=9, color=colors.HexColor("#FFFFFFCC"), font="Helvetica")
+        self._draw_paragraph(mid_x, vc + 7 * mm, mid_max_w, desc,
+                             size=8.5, color=colors.HexColor("#FFFFFFCC"), font="Helvetica")
 
-        # Recommended offer (if GO)
         if is_go and p.recommended_offer > 0:
-            self._text(self.margin + 55 * mm, self.y - 17.5 * mm,
+            self._text(mid_x, vc - 5 * mm,
                        f"Recommended Offer: ${p.recommended_offer:,.2f}",
-                       size=12, color=Palette.WHITE, font="Helvetica-Bold")
+                       size=11, color=Palette.WHITE, font="Helvetica-Bold")
 
-        # Confidence badge
-        rx = self.margin + uw - 5 * mm
-        self._text(rx, self.y - 10 * mm, f"{p.confidence:.0%}",
-                   size=20, color=Palette.WHITE, font="Helvetica-Bold", align="right")
-        self._text(rx, self.y - 14.5 * mm, "CONFIDENCE",
-                   size=6, color=colors.HexColor("#FFFFFF99"), font="Helvetica", align="right")
-
-        self.y = self.y - banner_h - 5 * mm
+        self.y = banner_bottom - 5 * mm
 
     # ── LISTING DETAILS ──
+    # DEFECT 1 FIX: Word-wrapped description via Paragraph
     def _render_listing_details(self):
         p = self.packet
         if not p.listing:
             return
 
         uw = self._usable_width()
-        section_h = 30 * mm
 
         # Section header
         self._text(self.margin, self.y - 3 * mm, "LISTING DETAILS",
@@ -317,26 +353,19 @@ class DealPacketPDF:
 
         # Two-column layout
         col1_x = self.margin
+        col1_w = uw / 2 - 4 * mm
         col2_x = self.margin + uw / 2
 
-        # Column 1: Title + Description
-        self._text(col1_x, y, listing.title[:60],
-                   size=11, color=Palette.INK, font="Helvetica-Bold")
-        y -= 5 * mm
+        # Column 1: Title (word-wrapped)
+        title_h = self._draw_paragraph(col1_x, y, col1_w, listing.title,
+                                       size=11, color=Palette.INK, font="Helvetica-Bold")
+        y -= title_h + 2 * mm
 
-        # Wrap description (simple truncation for now)
-        desc = listing.description[:120]
-        if len(listing.description) > 120:
-            desc += "..."
-        self._text(col1_x, y, desc,
-                   size=8, color=Palette.INK2, font="Helvetica")
-        y -= 4 * mm
-        if len(desc) > 70:
-            self._text(col1_x, y, desc[70:],
-                       size=8, color=Palette.INK2, font="Helvetica")
-            y -= 4 * mm
+        # Column 1: Description (word-wrapped, no truncation)
+        desc_h = self._draw_paragraph(col1_x, y, col1_w, listing.description,
+                                      size=8, color=Palette.INK2, font="Helvetica")
 
-        # Column 2: Key facts
+        # Column 2: Key facts — anchored to section top
         facts_y = self.y - 10 * mm
         facts = [
             ("Platform", listing.platform),
@@ -351,9 +380,14 @@ class DealPacketPDF:
                        size=8, color=Palette.INK, font="Helvetica-Bold")
             facts_y -= 4.5 * mm
 
-        self.y = self.y - section_h
+        # Advance by whichever column is taller
+        col1_total = (self.y - 10 * mm) - (y - desc_h)
+        col2_total = (self.y - 10 * mm) - facts_y
+        section_used = max(col1_total, col2_total)
+        self.y = self.y - 10 * mm - section_used - 4 * mm
 
     # ── ECONOMIC ANALYSIS ──
+    # DEFECT 2 FIX: Conditional rendering based on which gate vetoed
     def _render_economic_analysis(self):
         p = self.packet
         uw = self._usable_width()
@@ -364,6 +398,21 @@ class DealPacketPDF:
         self._draw_rect(self.margin, self.y - 4.5 * mm, uw, 0.3 * mm, Palette.RULE)
 
         y = self.y - 12 * mm
+
+        # DEFECT 2: If identity gate vetoed, economic gate never ran.
+        # Do NOT render price fields — they would be misleading.
+        if p.economic_result is None:
+            # Identity gate vetoed before economic gate could run
+            notice_h = 10 * mm
+            self._draw_rounded_rect(self.margin, y - notice_h, uw, notice_h, 2,
+                                    colors.HexColor("#FEF2F2"),
+                                    stroke=True, stroke_color=Palette.RED_DIM)
+            self._text(self.margin + 4 * mm, y - 6.5 * mm,
+                       "Not evaluated — listing vetoed at Gate 1: Identity",
+                       size=8.5, color=Palette.RED_DIM, font="Helvetica")
+            self.y = y - notice_h - 4 * mm
+            return
+
         listing = p.listing
 
         if listing:
@@ -387,7 +436,7 @@ class DealPacketPDF:
             y -= box_h + 4 * mm
 
             # Margin bar
-            if p.economic_result and p.economic_result.projected_margin is not None:
+            if p.economic_result.projected_margin is not None:
                 margin = p.economic_result.projected_margin
                 margin_pct = max(0, min(1, margin))  # Clamp 0-100%
 
@@ -431,6 +480,8 @@ class DealPacketPDF:
         self.y = y - 2 * mm
 
     # ── GATE STATUS ──
+    # DEFECT 3 FIX: Consistent alignment, word-wrapped descriptions,
+    # handle unreached gates, proper colours per verdict
     def _render_gate_status(self):
         p = self.packet
         uw = self._usable_width()
@@ -440,8 +491,7 @@ class DealPacketPDF:
         self._draw_rect(self.margin, self.y - 4.5 * mm, uw, 0.3 * mm, Palette.RULE)
 
         y = self.y - 10 * mm
-        gate_h = 8 * mm
-        gate_w = uw / 2 - 1.5 * mm
+        gate_w = uw / 2 - 2 * mm
 
         gates = [
             ("GATE 1: IDENTITY", p.identity_result),
@@ -449,32 +499,51 @@ class DealPacketPDF:
         ]
 
         for i, (name, result) in enumerate(gates):
-            gx = self.margin + i * (gate_w + 3 * mm)
-            passed = result.passed if result else False
-            bg = colors.HexColor("#E8F4EE") if passed else colors.HexColor("#FEF2F2")
-            border = Palette.GREEN if passed else Palette.RED
+            gx = self.margin + i * (gate_w + 4 * mm)
 
+            # Determine gate state: PASS, VETO, or NOT REACHED
+            if result is None:
+                # Gate was never reached (pipeline stopped before it)
+                indicator = "NOT EVALUATED"
+                ind_color = Palette.INK3
+                bg = colors.HexColor("#F5F3EF")
+                border = Palette.RULE
+                reason_text = "Pipeline halted at a prior gate before this gate was reached."
+            elif result.passed:
+                indicator = "PASS"
+                ind_color = Palette.GREEN
+                bg = colors.HexColor("#E8F4EE")
+                border = Palette.GREEN
+                reason_text = result.reason
+            else:
+                indicator = "VETO"
+                ind_color = Palette.RED
+                bg = colors.HexColor("#FEF2F2")
+                border = Palette.RED
+                reason_text = result.reason
+
+            # Gate card background — taller to allow word-wrapped description
+            gate_h = 10 * mm
             self._draw_rounded_rect(gx, y - gate_h, gate_w, gate_h, 2, bg,
                                     stroke=True, stroke_color=border)
 
-            # Status indicator
-            indicator = "PASS" if passed else "VETO"
-            ind_color = Palette.GREEN if passed else Palette.RED
-            self._text(gx + 3 * mm, y - 5.5 * mm, indicator,
+            # Gate label: bold, left-aligned, coloured by verdict
+            self._text(gx + 4 * mm, y - 4 * mm, indicator,
                        size=8, color=ind_color, font="Helvetica-Bold")
-
-            self._text(gx + 18 * mm, y - 5.5 * mm, name,
+            self._text(gx + 4 * mm + self.c.stringWidth(indicator, "Helvetica-Bold", 8) + 3 * mm,
+                       y - 4 * mm, name,
                        size=7, color=Palette.INK2, font="Helvetica")
 
-            # Reason (truncated)
-            if result and result.reason:
-                reason_short = result.reason[:55]
-                if len(result.reason) > 55:
-                    reason_short += "..."
-                self._text(gx + 3 * mm, y - gate_h - 2 * mm, reason_short,
-                           size=5.5, color=Palette.INK3, font="Helvetica")
+            # Gate description: indented 12pt, word-wrapped, normal weight
+            desc_top = y - gate_h - 1 * mm
+            desc_w = gate_w - 8 * mm
+            desc_h = self._draw_paragraph(gx + 4 * mm, desc_top, desc_w, reason_text,
+                                          size=6.5, color=Palette.INK3, font="Helvetica",
+                                          leading=8.5)
 
-        self.y = y - gate_h - 6 * mm
+        # Advance y past both gate cards + descriptions
+        # Use fixed spacing to keep layout predictable
+        self.y = y - gate_h - 14 * mm
 
     # ── RECOMMENDATION ──
     def _render_recommendation(self):
@@ -516,6 +585,7 @@ class DealPacketPDF:
         self.y = self.y - rec_h - 5 * mm
 
     # ── REASONING ──
+    # DEFECT 1 + 5 FIX: Full text, word-wrapped, no truncation
     def _render_reasoning(self):
         p = self.packet
         uw = self._usable_width()
@@ -525,16 +595,21 @@ class DealPacketPDF:
         self._draw_rect(self.margin, self.y - 4.5 * mm, uw, 0.3 * mm, Palette.RULE)
 
         y = self.y - 10 * mm
+        step_text_x = self.margin + 8 * mm
+        step_text_w = uw - 8 * mm  # Full remaining width for word-wrap
+
         for i, step in enumerate(p.reasoning[:6], 1):  # Max 6 steps
-            # Step number
+            # Step number badge
             self._draw_rounded_rect(self.margin, y - 3.5 * mm, 5 * mm, 4.5 * mm, 1,
                                     Palette.NAVY_LIGHT)
             self._text(self.margin + 2.5 * mm, y - 2 * mm, str(i),
                        size=6, color=Palette.GOLD, font="Helvetica-Bold", align="center")
-            # Step text
-            self._text(self.margin + 8 * mm, y - 2 * mm, step[:95],
-                       size=7.5, color=Palette.INK2, font="Helvetica")
-            y -= 6 * mm
+
+            # Step text — full content, word-wrapped
+            step_h = self._draw_paragraph(step_text_x, y, step_text_w, step,
+                                          size=7.5, color=Palette.INK2, font="Helvetica",
+                                          leading=10)
+            y -= max(step_h, 4.5 * mm) + 2 * mm
 
         # Risk flags
         if p.risk_flags:
@@ -543,9 +618,11 @@ class DealPacketPDF:
                        size=6, color=Palette.RED, font="Helvetica-Bold")
             y -= 5 * mm
             for flag in p.risk_flags[:3]:
-                self._text(self.margin + 3 * mm, y - 2 * mm, f"! {flag}",
-                           size=7, color=Palette.RED_DIM, font="Helvetica")
-                y -= 5 * mm
+                flag_h = self._draw_paragraph(self.margin + 3 * mm, y, uw - 3 * mm,
+                                              f"! {flag}",
+                                              size=7, color=Palette.RED_DIM, font="Helvetica",
+                                              leading=9)
+                y -= max(flag_h, 4 * mm) + 1 * mm
 
         self.y = y
 
@@ -610,7 +687,7 @@ def generate_sample_go(output_path: str = None) -> str:
         output_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
             "output",
-            f"DealPacket_{packet.packet_id}.pdf"
+            f"DealPacket_{packet.packet_id}_v2.pdf"
         )
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -642,7 +719,7 @@ def generate_sample_nogo(output_path: str = None) -> str:
         output_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
             "output",
-            f"DealPacket_{packet.packet_id}_NOGO.pdf"
+            f"DealPacket_{packet.packet_id}_NOGO_v2.pdf"
         )
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -652,19 +729,26 @@ def generate_sample_nogo(output_path: str = None) -> str:
 
 
 if __name__ == "__main__":
-    output = sys.argv[1] if len(sys.argv) > 1 else None
-
     print("=" * 60)
-    print("  CLEARBID DealPacket Generator")
+    print("  CLEARBID DealPacket Generator v2")
     print("=" * 60)
 
-    # Generate GO sample
-    go_path = generate_sample_go(output)
-    print(f"\n  [GO]    DealPacket saved: {go_path}")
+    args = sys.argv[1:]
 
-    # Generate NO-GO sample
-    nogo_path = generate_sample_nogo()
-    print(f"  [NO-GO] DealPacket saved: {nogo_path}")
+    if "--test-go" in args:
+        go_path = generate_sample_go()
+        print(f"\n  [GO]    DealPacket saved: {go_path}")
+    elif "--test-nogo" in args:
+        nogo_path = generate_sample_nogo()
+        print(f"\n  [NO-GO] DealPacket saved: {nogo_path}")
+    elif args and not args[0].startswith("--"):
+        go_path = generate_sample_go(args[0])
+        print(f"\n  [GO]    DealPacket saved: {go_path}")
+    else:
+        go_path = generate_sample_go()
+        print(f"\n  [GO]    DealPacket saved: {go_path}")
+        nogo_path = generate_sample_nogo()
+        print(f"  [NO-GO] DealPacket saved: {nogo_path}")
 
     print(f"\n  Open these files to see your premium DealPackets.")
     print("=" * 60)
