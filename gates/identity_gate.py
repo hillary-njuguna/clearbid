@@ -160,7 +160,7 @@ if __name__ == "__main__":
     print("=" * 60)
     for text, expected_pass in tests:
         result = identity_gate(text)
-        status = "✅" if result.passed == expected_pass else "❌"
+        status = "OK" if result.passed == expected_pass else "FAIL"
         display = text[:50] + "..." if len(text) > 50 else text or "(empty)"
         print(f"{status} [{result.verdict.value:>16}] {display}")
         if result.passed != expected_pass:
