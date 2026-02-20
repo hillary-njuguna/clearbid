@@ -14,13 +14,13 @@ Listing → γ-Node (Ingest) → μ-Node (Veto Gates) → α-Node (Reasoning) �
 
 ### Gate Pipeline (μ-Node)
 
-| Gate | File                      | Function                      | Status      |
-| ---- | ------------------------- | ----------------------------- | ----------- |
-| 1    | `gates/economic_gate.py`  | Margin viability check (>20%) | ✅ LIVE     |
-| 2    | `gates/identity_gate.py`  | WTB/wanted ad filter          | 🔨 Building |
-| 3    | `gates/source_gate.py`    | Seller reputation check       | 📋 Planned  |
-| 4    | `gates/shipping_gate.py`  | Logistics feasibility + FX    | 📋 Planned  |
-| 5    | `gates/composite_gate.py` | Full pipeline orchestration   | 📋 Planned  |
+| Gate | File                      | Function                           | Status  |
+| ---- | ------------------------- | ---------------------------------- | ------- |
+| 1    | `gates/economic_gate.py`  | Margin viability check (>20%)      | ✅ LIVE |
+| 2    | `gates/identity_gate.py`  | WTB/wanted ad filter               | ✅ LIVE |
+| 3    | `gates/source_gate.py`    | Seller reputation scoring          | ✅ LIVE |
+| 4    | `gates/shipping_gate.py`  | Logistics feasibility + duties/VAT | ✅ LIVE |
+| 5    | `gates/composite_gate.py` | Full 4-gate pipeline orchestration | ✅ LIVE |
 
 ### Output
 
