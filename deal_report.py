@@ -642,7 +642,7 @@ class DealPacketPDF:
         self._text(self.margin, 5 * mm, "CLEARBID",
                    size=7, color=Palette.GOLD, font="Helvetica-Bold")
         self._text(self.margin, 2 * mm,
-                   "Sovereign Decision Compiler  |  hillary.systems",
+                   "Deal Analysis Pipeline  |  hillary.systems",
                    size=5.5, color=colors.HexColor("#5A6A8B"), font="Helvetica")
 
         # Center: audit hash

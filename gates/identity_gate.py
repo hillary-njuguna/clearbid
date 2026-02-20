@@ -1,5 +1,5 @@
 """
-Gate 2: Identity / Intent Gate (μ-Node)
+Gate 2: Identity / Intent Gate
 =======================================
 Regex-based veto that filters out non-sale listings:
   - WTB (Want to Buy) posts
@@ -76,7 +76,7 @@ _VETO_PATTERNS = [
 
 # ── Sale-positive signals ──
 # If these appear WITH a veto pattern, reduce confidence of the veto.
-# Not used for overriding, but logged for α-Node context.
+# Not used for overriding, but logged for reasoning layer context.
 _SALE_SIGNALS = [
     re.compile(r'\b(?:for\s+sale|F/?S|selling|sell)\b', re.IGNORECASE),
     re.compile(r'\$\s*\d+', re.IGNORECASE),
@@ -125,13 +125,13 @@ def identity_gate(text: str) -> IdentityResult:
                 )
             else:
                 # Conflicting signals — still veto but note the ambiguity
-                # The α-Node can re-evaluate if needed
+                # The reasoning layer can re-evaluate if needed
                 return IdentityResult(
                     verdict=veto_code,
                     matched_patterns=matched,
                     original_text=cleaned,
                     reason=f"Non-sale intent detected: {label}. "
-                           f"NOTE: Sale-positive signals also present — α-Node may override."
+                           f"NOTE: Sale-positive signals also present — reasoning layer may override."
                 )
     
     # No veto patterns matched — listing passes

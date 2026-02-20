@@ -24,3 +24,24 @@ build/
 # Reports output
 output/
 *.pdf
+
+# === IP PROTECTION ===
+# Architecture documents (RSPS, node topology, etc.)
+*.architecture.md
+design/
+architecture/
+internal/
+notes/
+*.internal.*
+
+# Conversation exports
+conversations.json
+*.conversations.*
+shared-data/
+
+# Credentials & secrets
+.env
+*.key
+*.pem
+*.secret
+credentials/

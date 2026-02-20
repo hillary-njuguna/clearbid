@@ -1,9 +1,9 @@
 """
-Gate 5: Composite Gate — Full Pipeline Orchestrator (μ-Node)
+Gate 5: Composite Gate — Full Pipeline Orchestrator
 ============================================================
 Runs ALL gates in sequence, short-circuiting on first veto.
 Produces a unified CompositeResult that feeds directly into
-the α-Node (deal_report.py) for DealPacket generation.
+the reasoning layer (deal_report.py) for DealPacket generation.
 
 Gate execution order:
     1. Identity Gate   — is this a genuine sale listing?

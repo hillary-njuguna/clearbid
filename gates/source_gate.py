@@ -1,5 +1,5 @@
 """
-Gate 3: Source / Seller Reputation Gate (μ-Node)
+Gate 3: Source / Seller Reputation Gate
 =================================================
 Deterministic seller trustworthiness check. Scores sellers based on
 observable signals — account age proxies, listing history patterns,

@@ -1,18 +1,18 @@
-# ClearBid — Sovereign Decision Compiler
+# ClearBid — Deal Analysis Pipeline
 
 > One page. GO or NO-GO. Evidence included.
 
 **Send a listing. Receive a DealPacket. Keep the document.**
 
-ClearBid is a deterministic deal analysis pipeline for procurement, imports, used equipment, and fleet buying. It runs listings through a series of veto gates — cheap, fast, auditable — before bounded AI reasoning produces a structured DealPacket artifact.
+ClearBid is a deterministic deal analysis pipeline for procurement, imports, used equipment, and fleet buying. It runs listings through a series of veto gates — cheap, fast, auditable — before bounded reasoning produces a structured DealPacket artifact.
 
 ## Architecture
 
 ```
-Listing → γ-Node (Ingest) → μ-Node (Veto Gates) → α-Node (Reasoning) → τ-Node (Human Auth) → ρ-Node (Ledger)
+Listing → Ingest → Veto Gates (1-4) → Reasoning → Human Auth → Ledger
 ```
 
-### Gate Pipeline (μ-Node)
+### Gate Pipeline
 
 | Gate | File                      | Function                           | Status  |
 | ---- | ------------------------- | ---------------------------------- | ------- |
@@ -34,7 +34,9 @@ Listing → γ-Node (Ingest) → μ-Node (Veto Gates) → α-Node (Reasoning) �
 ## Usage
 
 ```bash
-python -m clearbid.pipeline "JDM engine 2JZ-GTE, asking $4500, located Tokyo"
+python deal_report.py              # Generate sample GO + NO-GO packets
+python deal_report.py --test-go    # GO sample only
+python deal_report.py --test-nogo  # NO-GO sample only
 ```
 
 ## Pricing

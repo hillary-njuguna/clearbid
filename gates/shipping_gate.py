@@ -1,5 +1,5 @@
 """
-Gate 4: Shipping & Logistics Feasibility Gate (μ-Node)
+Gate 4: Shipping & Logistics Feasibility Gate
 ======================================================
 Deterministic check on whether a deal is logistically viable:
   - Is the origin/destination route supported?
@@ -9,7 +9,7 @@ Deterministic check on whether a deal is logistically viable:
 
 This gate runs AFTER source (Gate 3) confirms seller credibility.
 It uses lookup tables, not live API calls — intended for fast
-deterministic veto before the expensive α-Node reasoning.
+deterministic veto before the expensive reasoning layer.
 
 Status: 🔨 BUILDING
 """

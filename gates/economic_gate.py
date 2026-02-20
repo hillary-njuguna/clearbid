@@ -1,5 +1,5 @@
 """
-Gate 1: Economic Viability Gate (μ-Node)
+Gate 1: Economic Viability Gate
 ========================================
 Deterministic margin check. Rejects listings where projected margin
 falls below the threshold — no LLM needed.
